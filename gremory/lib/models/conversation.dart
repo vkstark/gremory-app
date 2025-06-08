@@ -55,16 +55,16 @@ class Conversation {
       conversationState: json['conversation_state'] as String? ?? 'active',
       contextData: json['context_data'] as Map<String, dynamic>?,
       createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at'] as String)
+          ? _parseUtcDateTime(json['created_at'] as String)
           : DateTime.now(),
       updatedAt: json['updated_at'] != null 
-          ? DateTime.parse(json['updated_at'] as String)
+          ? _parseUtcDateTime(json['updated_at'] as String)
           : DateTime.now(),
       status: json['status'] as String? ?? json['conversation_state'] as String? ?? 'active',
       isArchived: json['is_archived'] as bool? ?? false,
       messageCount: json['message_count'] as int? ?? 0,
       lastMessageAt: json['last_message_at'] != null 
-          ? DateTime.parse(json['last_message_at'] as String)
+          ? _parseUtcDateTime(json['last_message_at'] as String)
           : null,
       lastMessagePreview: json['last_message_preview'] as String?,
       creatorUsername: json['creator_username'] as String?,
@@ -160,7 +160,10 @@ class Conversation {
   String get displayTime {
     final timeToCheck = lastMessageAt ?? updatedAt;
     final now = DateTime.now();
-    final difference = now.difference(timeToCheck);
+    
+    // Convert UTC time to local time for comparison
+    final localTime = timeToCheck.toLocal();
+    final difference = now.difference(localTime);
     
     if (difference.inMinutes < 1) {
       return 'Just now';
@@ -171,7 +174,7 @@ class Conversation {
     } else if (difference.inDays < 7) {
       return '${difference.inDays}d ago';
     } else {
-      return '${timeToCheck.day}/${timeToCheck.month}/${timeToCheck.year}';
+      return '${localTime.day}/${localTime.month}/${localTime.year}';
     }
   }
 
@@ -180,4 +183,13 @@ class Conversation {
   bool get isDeleted => status == 'deleted';
   bool get isPaused => conversationState == 'paused';
   bool get isCompleted => conversationState == 'completed';
+  
+  // Helper method to parse UTC datetime strings from API
+  static DateTime _parseUtcDateTime(String dateTimeString) {
+    // API returns datetime without 'Z' suffix, so we need to explicitly treat as UTC
+    if (!dateTimeString.endsWith('Z') && !dateTimeString.contains('+')) {
+      dateTimeString += 'Z';
+    }
+    return DateTime.parse(dateTimeString);
+  }
 }

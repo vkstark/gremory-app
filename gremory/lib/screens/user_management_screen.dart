@@ -44,15 +44,24 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
         backgroundColor: FallbackTheme.backgroundLight,
         foregroundColor: FallbackTheme.textPrimary,
         elevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: FallbackTheme.primaryPurple,
-          unselectedLabelColor: FallbackTheme.textSecondary,
-          indicatorColor: FallbackTheme.primaryPurple,
-          tabs: const [
-            Tab(text: 'Current User', icon: Icon(Icons.person)),
-            Tab(text: 'All Users', icon: Icon(Icons.group)),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48.0),
+          child: TabBar(
+            controller: _tabController,
+            labelColor: FallbackTheme.primaryPurple,
+            unselectedLabelColor: FallbackTheme.textSecondary,
+            indicatorColor: FallbackTheme.primaryPurple,
+            isScrollable: MediaQuery.of(context).size.width < 600,
+            tabs: MediaQuery.of(context).size.width < 400
+                ? const [
+                    Tab(icon: Icon(Icons.person), text: 'Current'),
+                    Tab(icon: Icon(Icons.group), text: 'All'),
+                  ]
+                : const [
+                    Tab(text: 'Current User', icon: Icon(Icons.person)),
+                    Tab(text: 'All Users', icon: Icon(Icons.group)),
+                  ],
+          ),
         ),
         actions: [
           Consumer<AuthProvider>(
@@ -607,12 +616,14 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
   }
 
   void _showCreateUserDialog() {
+    final isSmallScreen = MediaQuery.of(context).size.width < 600;
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Create New User'),
         content: SizedBox(
-          width: 400,
+          width: isSmallScreen ? MediaQuery.of(context).size.width * 0.9 : 400,
           child: Form(
             key: _formKey,
             child: Column(
@@ -621,12 +632,15 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
                 TextFormField(
                   controller: _usernameController,
                   decoration: const InputDecoration(
-                    labelText: 'Username',
-                    hintText: 'Enter username (optional)',
+                    labelText: 'Username *',
+                    hintText: 'Enter username',
                     border: OutlineInputBorder(),
                   ),
                   validator: (value) {
-                    if (value != null && value.isNotEmpty && value.length < 3) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Username is required';
+                    }
+                    if (value.trim().length < 3) {
                       return 'Username must be at least 3 characters';
                     }
                     return null;
@@ -791,7 +805,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
   void _handleCreateUser(AuthProvider authProvider) async {
     if (_formKey.currentState?.validate() == true) {
       await authProvider.createAndSwitchToNewUser(
-        username: _usernameController.text.trim().isNotEmpty ? _usernameController.text.trim() : null,
+        username: _usernameController.text.trim(),
         email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
         displayName: _displayNameController.text.trim(),
         phoneNumber: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
@@ -800,6 +814,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
       if (mounted && authProvider.error == null) {
         Navigator.of(context).pop();
         _clearForm();
+        // Navigate back to home screen
+        Navigator.of(context).popUntil((route) => route.isFirst);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('User created successfully!'),
@@ -836,6 +852,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
     await authProvider.switchToUser(user);
     
     if (mounted && authProvider.error == null) {
+      // Navigate back to home screen
+      Navigator.of(context).popUntil((route) => route.isFirst);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Switched to ${user.displayName}'),

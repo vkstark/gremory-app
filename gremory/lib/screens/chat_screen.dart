@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -40,7 +39,17 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       final chatProvider = context.read<ChatProvider>();
       
       authProvider.initialize();
-      chatProvider.initialize();
+      chatProvider.initialize(userId: authProvider.currentUser?.id);
+      
+      // Listen for auth changes and refresh chat data
+      authProvider.addListener(() {
+        if (mounted) {
+          final userId = authProvider.currentUser?.id;
+          if (userId != null) {
+            chatProvider.initialize(userId: userId);
+          }
+        }
+      });
     });
   }
 
@@ -486,59 +495,52 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           decoration: const BoxDecoration(
             color: FallbackTheme.backgroundCard,
             border: Border(top: BorderSide(color: FallbackTheme.borderLight)),
-          ),
-          child: KeyboardListener(
-            focusNode: FocusNode(),
-            onKeyEvent: (KeyEvent event) {
-              if (event is KeyDownEvent &&
-                  event.logicalKey == LogicalKeyboardKey.enter &&
-                  !HardwareKeyboard.instance.isShiftPressed) {
-                final text = _textController.text.trim();
-                if (text.isNotEmpty && !chatProvider.isLoading) {
-                  _sendMessage(text, authProvider, chatProvider);
-                }
-              }
-            },
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _textController,
-                    maxLines: null,
-                    decoration: const InputDecoration(
-                      hintText: 'Type your message... (Enter to send, Shift+Enter for new line)',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    enabled: !chatProvider.isLoading,
+          ),          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _textController,
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (text) {
+                    if (text.trim().isNotEmpty && !chatProvider.isLoading) {
+                      _sendMessage(text.trim(), authProvider, chatProvider);
+                    }
+                  },
+                  decoration: const InputDecoration(
+                    hintText: 'Type your message... (Enter to send, Shift+Enter for new line)',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
+                  enabled: !chatProvider.isLoading,
                 ),
-                const SizedBox(width: 12),
-                FloatingActionButton(
-                  onPressed: chatProvider.isLoading
-                      ? null
-                      : () {
-                          final text = _textController.text.trim();
-                          if (text.isNotEmpty) {
-                            _sendMessage(text, authProvider, chatProvider);
-                          }
-                        },
-                  backgroundColor: chatProvider.isLoading
-                      ? FallbackTheme.textLight
-                      : FallbackTheme.primaryPurple,
-                  child: chatProvider.isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Icon(Icons.send, color: Colors.white),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              FloatingActionButton(
+                onPressed: chatProvider.isLoading
+                    ? null
+                    : () {
+                        final text = _textController.text.trim();
+                        if (text.isNotEmpty) {
+                          _sendMessage(text, authProvider, chatProvider);
+                        }
+                      },
+                backgroundColor: chatProvider.isLoading
+                    ? FallbackTheme.textLight
+                    : FallbackTheme.primaryPurple,
+                child: chatProvider.isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.send, color: Colors.white),
+              ),
+            ],
           ),
         );
       },

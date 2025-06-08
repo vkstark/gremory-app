@@ -25,8 +25,11 @@ class ChatProvider extends ChangeNotifier {
   String? get error => _error;
   String get selectedModel => _selectedModel;
 
-  Future<void> initialize() async {
+  Future<void> initialize({int? userId}) async {
     await loadSupportedModels();
+    if (userId != null) {
+      await loadUserConversations(userId);
+    }
   }
 
   Future<void> loadSupportedModels() async {

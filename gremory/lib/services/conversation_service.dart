@@ -12,7 +12,16 @@ class ConversationService {
       
       // Parse conversations from the new response structure
       final List<dynamic> conversationsData = response['conversations'] ?? [];
-      return conversationsData.map((json) => Conversation.fromJson(json)).toList();
+      final conversations = conversationsData.map((json) => Conversation.fromJson(json)).toList();
+      
+      // Sort conversations by last activity (last_message_at or updated_at), most recent first
+      conversations.sort((a, b) {
+        final aTime = a.lastMessageAt ?? a.updatedAt;
+        final bTime = b.lastMessageAt ?? b.updatedAt;
+        return bTime.compareTo(aTime); // Descending order (most recent first)
+      });
+      
+      return conversations;
     } catch (e) {
       Logger.error('Error loading conversations', 'ConversationService', e);
       return [];
