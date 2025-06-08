@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
+import '../utils/logger.dart';
 
 class UserService {
   final String baseUrl = "https://gremory-backend.onrender.com/api/v1";
@@ -35,7 +36,7 @@ class UserService {
         requestBody['phone_number'] = phoneNumber;
       }
 
-      print('Creating user with payload: ${jsonEncode(requestBody)}');
+      Logger.debug('Creating user with payload: ${jsonEncode(requestBody)}', 'UserService');
 
       final response = await http.post(
         Uri.parse('$baseUrl/users'),
@@ -43,7 +44,7 @@ class UserService {
         body: jsonEncode(requestBody),
       );
 
-      print('Create user response: ${response.statusCode} - ${response.body}');
+      Logger.debug('Create user response: ${response.statusCode} - ${response.body}', 'UserService');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
@@ -62,7 +63,7 @@ class UserService {
         throw Exception('Failed to create user: ${errorData['message'] ?? response.statusCode}');
       }
     } catch (e) {
-      print('Error creating user: $e');
+      Logger.error('Error creating user', 'UserService', e);
       throw Exception('Error creating user: $e');
     }
   }
@@ -78,16 +79,12 @@ class UserService {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
         
         // Handle different response structures
-        if (responseData is Map<String, dynamic>) {
-          // If it's wrapped in a response structure
-          if (responseData.containsKey('data')) {
-            return User.fromJson(responseData['data']);
-          } else {
-            // Direct user data
-            return User.fromJson(responseData);
-          }
+        // If it's wrapped in a response structure
+        if (responseData.containsKey('data')) {
+          return User.fromJson(responseData['data']);
         } else {
-          throw Exception('Invalid response format');
+          // Direct user data
+          return User.fromJson(responseData);
         }
       } else {
         final errorData = jsonDecode(response.body);

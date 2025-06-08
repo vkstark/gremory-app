@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/user_service.dart';
+import '../utils/logger.dart';
 
 class AuthProvider extends ChangeNotifier {
   final UserService _userService = UserService();
@@ -30,7 +31,7 @@ class AuthProvider extends ChangeNotifier {
         try {
           _currentUser = await _userService.getUserById(userId);
         } catch (e) {
-          print('Failed to load user from backend: $e');
+          Logger.error('Failed to load user from backend', 'AuthProvider', e);
           // Create guest user if backend fails
           await _createGuestUser();
         }
@@ -72,7 +73,7 @@ class AuthProvider extends ChangeNotifier {
       );
       notifyListeners();
     } catch (e) {
-      print('Failed to load available users: $e');
+      Logger.error('Failed to load available users', 'AuthProvider', e);
     }
   }
 

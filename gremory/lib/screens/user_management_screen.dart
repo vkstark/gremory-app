@@ -860,13 +860,17 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.of(context).pop();
+              final navigator = Navigator.of(context);
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              final userName = user.displayName;
+              
+              navigator.pop();
               await authProvider.deleteUser(user.id);
               
               if (mounted && authProvider.error == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                scaffoldMessenger.showSnackBar(
                   SnackBar(
-                    content: Text('${user.displayName} deleted successfully'),
+                    content: Text('$userName deleted successfully'),
                     backgroundColor: Colors.green,
                   ),
                 );

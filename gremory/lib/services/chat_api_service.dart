@@ -160,18 +160,33 @@ class ChatAPIService {
     }
   }
 
-  // New methods to match your backend conversation endpoints
+  // User History API endpoints (updated for new consolidated API)
   Future<Map<String, dynamic>> getUserConversations({
     required int userId,
     int page = 1,
     int perPage = 20,
+    String sortBy = 'created_at',
+    String sortOrder = 'desc',
+    String? conversationType,
+    String? conversationState,
+    bool? isArchived,
+    String? searchQuery,
   }) async {
     try {
-      final uri = Uri.parse('$baseUrl/conversations/$userId').replace(
-        queryParameters: {
-          'page': page.toString(),
-          'per_page': perPage.toString(),
-        },
+      final Map<String, String> queryParams = {
+        'page': page.toString(),
+        'per_page': perPage.toString(),
+        'sort_by': sortBy,
+        'sort_order': sortOrder,
+      };
+      
+      if (conversationType != null) queryParams['conversation_type'] = conversationType;
+      if (conversationState != null) queryParams['conversation_state'] = conversationState;
+      if (isArchived != null) queryParams['is_archived'] = isArchived.toString();
+      if (searchQuery != null) queryParams['search_query'] = searchQuery;
+
+      final uri = Uri.parse('$baseUrl/user/$userId/history').replace(
+        queryParameters: queryParams,
       );
 
       final response = await http.get(
@@ -190,12 +205,19 @@ class ChatAPIService {
   }
 
   Future<Map<String, dynamic>> getConversationDetails({
-    required int userId,
     required int conversationId,
+    int? userId,
   }) async {
     try {
+      final Map<String, String> queryParams = {};
+      if (userId != null) queryParams['user_id'] = userId.toString();
+
+      final uri = Uri.parse('$baseUrl/conversation/$conversationId').replace(
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
+
       final response = await http.get(
-        Uri.parse('$baseUrl/conversations/$userId/$conversationId'),
+        uri,
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -209,17 +231,107 @@ class ChatAPIService {
     }
   }
 
+  Future<Map<String, dynamic>> getConversationMessages({
+    required int conversationId,
+    int? userId,
+    int page = 1,
+    int perPage = 50,
+    String sortBy = 'created_at',
+    String sortOrder = 'asc',
+    String? messageType,
+    int? senderId,
+    String? searchQuery,
+    bool includeDeleted = false,
+  }) async {
+    try {
+      final Map<String, String> queryParams = {
+        'page': page.toString(),
+        'per_page': perPage.toString(),
+        'sort_by': sortBy,
+        'sort_order': sortOrder,
+        'include_deleted': includeDeleted.toString(),
+      };
+      
+      if (userId != null) queryParams['user_id'] = userId.toString();
+      if (messageType != null) queryParams['message_type'] = messageType;
+      if (senderId != null) queryParams['sender_id'] = senderId.toString();
+      if (searchQuery != null) queryParams['search_query'] = searchQuery;
+
+      final uri = Uri.parse('$baseUrl/conversation/$conversationId/messages').replace(
+        queryParameters: queryParams,
+      );
+
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to load conversation messages: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error loading conversation messages: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> sendMessageToConversation({
+    required int conversationId,
+    required int senderId,
+    required String content,
+    String messageType = 'text',
+    int? replyToId,
+    Map<String, dynamic>? messageMetadata,
+  }) async {
+    try {
+      final Map<String, dynamic> requestBody = {
+        'conversation_id': conversationId,
+        'sender_id': senderId,
+        'content': content,
+        'message_type': messageType,
+      };
+
+      if (replyToId != null) requestBody['reply_to_id'] = replyToId;
+      if (messageMetadata != null) requestBody['message_metadata'] = messageMetadata;
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/conversation/$conversationId/messages'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to send message: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error sending message: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> createNewConversation({
     required int userId,
     String? title,
+    String conversationType = 'direct',
+    String? description,
+    Map<String, dynamic>? contextData,
   }) async {
     try {
+      final Map<String, dynamic> requestBody = {
+        'user_id': userId,
+        'conversation_type': conversationType,
+      };
+
+      if (title != null) requestBody['title'] = title;
+      if (description != null) requestBody['description'] = description;
+      if (contextData != null) requestBody['context_data'] = contextData;
+
       final response = await http.post(
-        Uri.parse('$baseUrl/conversations/$userId/new'),
+        Uri.parse('$baseUrl/user/history'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'title': title,
-        }),
+        body: jsonEncode(requestBody),
       );
 
       if (response.statusCode == 200) {
@@ -232,13 +344,58 @@ class ChatAPIService {
     }
   }
 
-  Future<Map<String, dynamic>> continueConversation({
-    required int userId,
+  Future<Map<String, dynamic>> updateConversation({
     required int conversationId,
+    int? userId,
+    String? name,
+    String? description,
+    String? conversationState,
+    Map<String, dynamic>? contextData,
   }) async {
     try {
+      final Map<String, String> queryParams = {};
+      if (userId != null) queryParams['user_id'] = userId.toString();
+
+      final Map<String, dynamic> requestBody = {};
+      if (name != null) requestBody['name'] = name;
+      if (description != null) requestBody['description'] = description;
+      if (conversationState != null) requestBody['conversation_state'] = conversationState;
+      if (contextData != null) requestBody['context_data'] = contextData;
+
+      final uri = Uri.parse('$baseUrl/conversation/$conversationId').replace(
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
+
       final response = await http.put(
-        Uri.parse('$baseUrl/conversations/$userId/$conversationId/continue'),
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to update conversation: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error updating conversation: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> continueConversation({
+    required int conversationId,
+    int? userId,
+  }) async {
+    try {
+      final Map<String, String> queryParams = {};
+      if (userId != null) queryParams['user_id'] = userId.toString();
+
+      final uri = Uri.parse('$baseUrl/conversation/$conversationId/continue').replace(
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
+
+      final response = await http.put(
+        uri,
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -252,13 +409,47 @@ class ChatAPIService {
     }
   }
 
-  Future<void> deleteConversation({
-    required int userId,
+  Future<Map<String, dynamic>> archiveConversation({
     required int conversationId,
+    int? userId,
   }) async {
     try {
+      final Map<String, String> queryParams = {};
+      if (userId != null) queryParams['user_id'] = userId.toString();
+
+      final uri = Uri.parse('$baseUrl/conversation/$conversationId/archive').replace(
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
+
+      final response = await http.put(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to archive conversation: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error archiving conversation: $e');
+    }
+  }
+
+  Future<void> deleteConversation({
+    required int conversationId,
+    int? userId,
+  }) async {
+    try {
+      final Map<String, String> queryParams = {};
+      if (userId != null) queryParams['user_id'] = userId.toString();
+
+      final uri = Uri.parse('$baseUrl/conversation/$conversationId').replace(
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
+
       final response = await http.delete(
-        Uri.parse('$baseUrl/conversations/$userId/$conversationId'),
+        uri,
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -267,6 +458,18 @@ class ChatAPIService {
       }
     } catch (e) {
       throw Exception('Error deleting conversation: $e');
+    }
+  }
+
+  Future<bool> userHistoryHealthCheck() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/user-history/health'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
     }
   }
 }

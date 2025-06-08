@@ -1,8 +1,7 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import '../models/conversation.dart';
 import '../models/message.dart';
 import '../services/chat_api_service.dart';
+import '../utils/logger.dart';
 
 class ConversationService {
   final ChatAPIService _chatApiService = ChatAPIService();
@@ -11,22 +10,27 @@ class ConversationService {
     try {
       final response = await _chatApiService.getUserConversations(userId: userId);
       
-      // Parse conversations from the response
-      final List<dynamic> conversationsData = response['conversations'] ?? response['data'] ?? [];
+      // Parse conversations from the new response structure
+      final List<dynamic> conversationsData = response['conversations'] ?? [];
       return conversationsData.map((json) => Conversation.fromJson(json)).toList();
     } catch (e) {
-      print('Error loading conversations: $e');
+      Logger.error('Error loading conversations', 'ConversationService', e);
       return [];
     }
   }
 
-  Future<List<Message>> getConversationMessages(int conversationId) async {
+  Future<List<Message>> getConversationMessages(int conversationId, {int? userId}) async {
     try {
-      // For now, we'll use a placeholder since we need to know the userId
-      // This method might need to be refactored to include userId
-      return [];
+      final response = await _chatApiService.getConversationMessages(
+        conversationId: conversationId,
+        userId: userId,
+      );
+      
+      // Extract messages from the new response structure
+      final List<dynamic> messagesData = response['messages'] ?? [];
+      return messagesData.map((json) => Message.fromJson(json)).toList();
     } catch (e) {
-      print('Error loading messages: $e');
+      Logger.error('Error loading messages', 'ConversationService', e);
       return [];
     }
   }
@@ -34,8 +38,8 @@ class ConversationService {
   Future<List<Message>> getConversationDetails(int userId, int conversationId) async {
     try {
       final response = await _chatApiService.getConversationDetails(
-        userId: userId,
         conversationId: conversationId,
+        userId: userId,
       );
       
       // Extract messages from the conversation details
@@ -44,7 +48,7 @@ class ConversationService {
       
       return messagesData.map((json) => Message.fromJson(json)).toList();
     } catch (e) {
-      print('Error loading conversation details: $e');
+      Logger.error('Error loading conversation details', 'ConversationService', e);
       return [];
     }
   }
@@ -52,11 +56,17 @@ class ConversationService {
   Future<Conversation> createConversation({
     required int userId,
     required String title,
+    String conversationType = 'direct',
+    String? description,
+    Map<String, dynamic>? contextData,
   }) async {
     try {
       final response = await _chatApiService.createNewConversation(
         userId: userId,
         title: title,
+        conversationType: conversationType,
+        description: description,
+        contextData: contextData,
       );
       
       final conversationData = response['data'] ?? response;
@@ -66,44 +76,85 @@ class ConversationService {
     }
   }
 
-  Future<void> updateConversationStatus(int conversationId, String status) async {
+  Future<void> updateConversationStatus(int conversationId, String status, {int? userId}) async {
     try {
-      // This functionality might need to be implemented in the backend
-      // For now, we'll implement it as a placeholder
-      print('Update conversation status not implemented in backend');
+      await _chatApiService.updateConversation(
+        conversationId: conversationId,
+        userId: userId,
+        conversationState: status,
+      );
     } catch (e) {
-      print('Error updating conversation status: $e');
+      Logger.error('Error updating conversation status', 'ConversationService', e);
     }
   }
 
-  Future<void> updateConversationTitle(int conversationId, String title) async {
+  Future<void> updateConversationTitle(int conversationId, String title, {int? userId}) async {
     try {
-      // This functionality might need to be implemented in the backend
-      print('Update conversation title not implemented in backend');
+      await _chatApiService.updateConversation(
+        conversationId: conversationId,
+        userId: userId,
+        name: title,
+      );
     } catch (e) {
-      print('Error updating conversation title: $e');
+      Logger.error('Error updating conversation title', 'ConversationService', e);
+    }
+  }
+
+  Future<void> archiveConversation(int conversationId, {int? userId}) async {
+    try {
+      await _chatApiService.archiveConversation(
+        conversationId: conversationId,
+        userId: userId,
+      );
+    } catch (e) {
+      Logger.error('Error archiving conversation', 'ConversationService', e);
     }
   }
 
   Future<void> deleteConversation(int userId, int conversationId) async {
     try {
       await _chatApiService.deleteConversation(
-        userId: userId,
         conversationId: conversationId,
+        userId: userId,
       );
     } catch (e) {
-      print('Error deleting conversation: $e');
+      Logger.error('Error deleting conversation', 'ConversationService', e);
     }
   }
 
   Future<void> continueConversation(int userId, int conversationId) async {
     try {
       await _chatApiService.continueConversation(
-        userId: userId,
         conversationId: conversationId,
+        userId: userId,
       );
     } catch (e) {
-      print('Error continuing conversation: $e');
+      Logger.error('Error continuing conversation', 'ConversationService', e);
+    }
+  }
+
+  Future<Message> sendMessageToConversation({
+    required int conversationId,
+    required int senderId,
+    required String content,
+    String messageType = 'text',
+    int? replyToId,
+    Map<String, dynamic>? messageMetadata,
+  }) async {
+    try {
+      final response = await _chatApiService.sendMessageToConversation(
+        conversationId: conversationId,
+        senderId: senderId,
+        content: content,
+        messageType: messageType,
+        replyToId: replyToId,
+        messageMetadata: messageMetadata,
+      );
+      
+      final messageData = response['data'] ?? response;
+      return Message.fromJson(messageData);
+    } catch (e) {
+      throw Exception('Error sending message: $e');
     }
   }
 }

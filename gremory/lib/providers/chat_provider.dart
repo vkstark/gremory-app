@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../models/message.dart';
 import '../models/conversation.dart';
@@ -201,7 +200,7 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> archiveConversation(int conversationId, int userId) async {
     try {
-      await _conversationService.updateConversationStatus(conversationId, 'archived');
+      await _conversationService.archiveConversation(conversationId, userId: userId);
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index != -1) {
         _conversations[index] = _conversations[index].copyWith(status: 'archived');
@@ -237,7 +236,7 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> updateConversationTitle(int conversationId, String newTitle, int userId) async {
     try {
-      await _conversationService.updateConversationTitle(conversationId, newTitle);
+      await _conversationService.updateConversationTitle(conversationId, newTitle, userId: userId);
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index != -1) {
         _conversations[index] = _conversations[index].copyWith(title: newTitle);

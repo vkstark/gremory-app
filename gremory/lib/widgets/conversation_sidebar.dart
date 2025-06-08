@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
-import '../providers/auth_provider.dart';
 import '../models/conversation.dart';
 import '../theme/fallback_theme.dart';
 
@@ -199,16 +198,28 @@ class _ConversationSidebarState extends State<ConversationSidebar> {
                             ],
                           ),
                         ),
-                        const PopupMenuItem(
-                          value: 'archive',
-                          child: Row(
-                            children: [
-                              Icon(Icons.archive, size: 16),
-                              SizedBox(width: 8),
-                              Text('Archive'),
-                            ],
+                        if (!conversation.isArchivedStatus)
+                          const PopupMenuItem(
+                            value: 'archive',
+                            child: Row(
+                              children: [
+                                Icon(Icons.archive, size: 16),
+                                SizedBox(width: 8),
+                                Text('Archive'),
+                              ],
+                            ),
                           ),
-                        ),
+                        if (conversation.isArchivedStatus)
+                          const PopupMenuItem(
+                            value: 'unarchive',
+                            child: Row(
+                              children: [
+                                Icon(Icons.unarchive, size: 16),
+                                SizedBox(width: 8),
+                                Text('Unarchive'),
+                              ],
+                            ),
+                          ),
                         const PopupMenuItem(
                           value: 'delete',
                           child: Row(
@@ -243,7 +254,7 @@ class _ConversationSidebarState extends State<ConversationSidebar> {
                       ),
                     ),
                     const Spacer(),
-                    if (conversation.status == 'archived') ...[
+                    if (conversation.isArchivedStatus) ...[
                       Icon(
                         Icons.archive,
                         size: 12,
@@ -251,7 +262,7 @@ class _ConversationSidebarState extends State<ConversationSidebar> {
                       ),
                       const SizedBox(width: 4),
                     ],
-                    if (conversation.messages.isNotEmpty)
+                    if (conversation.messageCount > 0)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
@@ -259,7 +270,7 @@ class _ConversationSidebarState extends State<ConversationSidebar> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '${conversation.messages.length}',
+                          '${conversation.messageCount}',
                           style: const TextStyle(
                             fontSize: 10,
                             color: FallbackTheme.primaryPurple,
@@ -297,6 +308,9 @@ class _ConversationSidebarState extends State<ConversationSidebar> {
         break;
       case 'archive':
         chatProvider.archiveConversation(conversation.id!, widget.userId);
+        break;
+      case 'unarchive':
+        chatProvider.continueConversation(conversation.id!, widget.userId);
         break;
       case 'delete':
         _showDeleteConfirmation(conversation, chatProvider);
