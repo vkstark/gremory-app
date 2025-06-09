@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
+const String baseUrl = String.fromEnvironment('BASE_URL');
 class ChatAPIService {
-  final String baseUrl = "https://gremory-backend.onrender.com/api/v1";
 
   Future<List<String>> getSupportedModels() async {
     try {

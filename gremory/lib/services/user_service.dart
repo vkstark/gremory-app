@@ -3,8 +3,8 @@ import 'package:http/http.dart' as http;
 import '../models/user.dart';
 import '../utils/logger.dart';
 
+const String baseUrl = String.fromEnvironment('BASE_URL');
 class UserService {
-  final String baseUrl = "https://gremory-backend.onrender.com/api/v1";
 
   Future<User> createUser({
     String? username,
