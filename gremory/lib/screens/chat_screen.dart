@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
@@ -24,6 +25,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
   bool _showSidebar = false;
   int? _currentUserId; // Track current user ID to detect changes
+  bool _wasLoadingConversation = false; // Track previous loading state
 
   @override
   void initState() {
@@ -42,15 +44,46 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       
       authProvider.initialize();
       chatProvider.initialize(userId: authProvider.currentUser?.id);
+
+      // Listen to chatProvider changes for animation trigger
+      // Initialize _wasLoadingConversation with the initial state from provider
+      _wasLoadingConversation = chatProvider.isLoadingConversation;
+      chatProvider.addListener(_handleChatProviderChanges);
     });
   }
 
   @override
   void dispose() {
+    // It's good practice to try-catch removeListener if provider might be disposed before screen
+    try {
+      context.read<ChatProvider>().removeListener(_handleChatProviderChanges);
+    } catch (e) {
+      // Handle or log error if necessary, e.g. if provider is already disposed
+      if (kDebugMode) {
+        print("Error removing listener from ChatProvider: $e");
+      }
+    }
     _animationController.dispose();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleChatProviderChanges() {
+    // Ensure the widget is still mounted before accessing context or setState
+    if (!mounted) return;
+
+    final chatProvider = context.read<ChatProvider>();
+    // If conversation was loading and now it's not, and there are messages
+    if (_wasLoadingConversation && !chatProvider.isLoadingConversation && chatProvider.messages.isNotEmpty) {
+      if (mounted) { // Check mounted again before animation calls
+        _animationController.reset();
+        _animationController.forward();
+        _scrollToBottom();
+      }
+    }
+    // Update the tracked loading state
+    _wasLoadingConversation = chatProvider.isLoadingConversation;
   }
 
   void _scrollToBottom() {
