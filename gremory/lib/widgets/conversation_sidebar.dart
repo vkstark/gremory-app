@@ -27,11 +27,24 @@ class _ConversationSidebarState extends State<ConversationSidebar> {
     _loadConversations();
   }
 
+  @override
+  void didUpdateWidget(ConversationSidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Check if user changed and reload conversations
+    if (oldWidget.userId != widget.userId) {
+      _loadConversations();
+    }
+  }
+
   Future<void> _loadConversations() async {
-    setState(() => _isLoading = true);
+    if (mounted && widget.userId > 0) {
+      setState(() => _isLoading = true);
+    }
     final chatProvider = context.read<ChatProvider>();
-    await chatProvider.loadUserConversations(widget.userId);
-    setState(() => _isLoading = false);
+    await chatProvider.refreshConversations(widget.userId);
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -71,6 +84,21 @@ class _ConversationSidebarState extends State<ConversationSidebar> {
             ),
           ),
           const Spacer(),
+          // Add refresh button
+          IconButton(
+            onPressed: _isLoading ? null : _loadConversations,
+            icon: _isLoading 
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: FallbackTheme.primaryPurple,
+                    ),
+                  )
+                : const Icon(Icons.refresh, color: FallbackTheme.textSecondary),
+            tooltip: 'Refresh conversations',
+          ),
           IconButton(
             onPressed: widget.onClose,
             icon: const Icon(Icons.close, color: FallbackTheme.textSecondary),

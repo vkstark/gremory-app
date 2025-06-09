@@ -242,6 +242,7 @@ class ChatAPIService {
     int? senderId,
     String? searchQuery,
     bool includeDeleted = false,
+    bool includeConversationDetails = false,
   }) async {
     try {
       final Map<String, String> queryParams = {
@@ -250,6 +251,7 @@ class ChatAPIService {
         'sort_by': sortBy,
         'sort_order': sortOrder,
         'include_deleted': includeDeleted.toString(),
+        'include_conversation_details': includeConversationDetails.toString(),
       };
       
       if (userId != null) queryParams['user_id'] = userId.toString();
@@ -286,7 +288,6 @@ class ChatAPIService {
   }) async {
     try {
       final Map<String, dynamic> requestBody = {
-        'conversation_id': conversationId,
         'sender_id': senderId,
         'content': content,
         'message_type': messageType,
@@ -314,6 +315,7 @@ class ChatAPIService {
   Future<Map<String, dynamic>> createNewConversation({
     required int userId,
     String? title,
+    String? name,
     String conversationType = 'direct',
     String? description,
     Map<String, dynamic>? contextData,
@@ -324,7 +326,13 @@ class ChatAPIService {
         'conversation_type': conversationType,
       };
 
-      if (title != null) requestBody['title'] = title;
+      // Use 'name' field as per the new API schema, fallback to 'title' for backward compatibility
+      if (name != null) {
+        requestBody['name'] = name;
+      } else if (title != null) {
+        requestBody['name'] = title;
+      }
+      
       if (description != null) requestBody['description'] = description;
       if (contextData != null) requestBody['context_data'] = contextData;
 
@@ -382,58 +390,30 @@ class ChatAPIService {
     }
   }
 
-  Future<Map<String, dynamic>> continueConversation({
-    required int conversationId,
-    int? userId,
-  }) async {
-    try {
-      final Map<String, String> queryParams = {};
-      if (userId != null) queryParams['user_id'] = userId.toString();
-
-      final uri = Uri.parse('$baseUrl/conversation/$conversationId/continue').replace(
-        queryParameters: queryParams.isNotEmpty ? queryParams : null,
-      );
-
-      final response = await http.put(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception('Failed to continue conversation: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error continuing conversation: $e');
-    }
-  }
-
+  // Archive conversation by updating conversation_state to 'archived'
   Future<Map<String, dynamic>> archiveConversation({
     required int conversationId,
     int? userId,
   }) async {
-    try {
-      final Map<String, String> queryParams = {};
-      if (userId != null) queryParams['user_id'] = userId.toString();
+    return updateConversation(
+      conversationId: conversationId,
+      userId: userId,
+      conversationState: 'archived',
+      contextData: {'operation': 'archive', 'timestamp': DateTime.now().toIso8601String()},
+    );
+  }
 
-      final uri = Uri.parse('$baseUrl/conversation/$conversationId/archive').replace(
-        queryParameters: queryParams.isNotEmpty ? queryParams : null,
-      );
-
-      final response = await http.put(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception('Failed to archive conversation: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error archiving conversation: $e');
-    }
+  // Continue conversation by updating conversation_state to 'active'
+  Future<Map<String, dynamic>> continueConversation({
+    required int conversationId,
+    int? userId,
+  }) async {
+    return updateConversation(
+      conversationId: conversationId,
+      userId: userId,
+      conversationState: 'active',
+      contextData: {'operation': 'continue', 'timestamp': DateTime.now().toIso8601String()},
+    );
   }
 
   Future<void> deleteConversation({

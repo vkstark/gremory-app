@@ -13,6 +13,7 @@ class ChatProvider extends ChangeNotifier {
   List<Conversation> _conversations = [];
   Conversation? _currentConversation;
   bool _isLoading = false;
+  bool _isLoadingConversation = false;
   String? _error;
   String _selectedModel = 'gemini_2o_flash';
 
@@ -22,12 +23,13 @@ class ChatProvider extends ChangeNotifier {
   List<Conversation> get conversations => _conversations;
   Conversation? get currentConversation => _currentConversation;
   bool get isLoading => _isLoading;
+  bool get isLoadingConversation => _isLoadingConversation;
   String? get error => _error;
   String get selectedModel => _selectedModel;
 
   Future<void> initialize({int? userId}) async {
     await loadSupportedModels();
-    if (userId != null) {
+    if (userId != null && userId > 0) {
       await loadUserConversations(userId);
     }
   }
@@ -185,20 +187,37 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> loadConversation(Conversation conversation, int userId) async {
     _currentConversation = conversation;
-    _messages.clear();
+    _isLoadingConversation = true;
     _error = null;
+    notifyListeners(); // Notify that we're starting to load
+    
+    if (kDebugMode) {
+      print('Loading conversation: ${conversation.id} with ${conversation.messageCount} messages');
+    }
     
     try {
       final messages = await _conversationService.getConversationDetails(userId, conversation.id!);
+      
+      if (kDebugMode) {
+        print('Loaded ${messages.length} messages from conversation ${conversation.id}');
+        for (int i = 0; i < messages.length; i++) {
+          final msg = messages[i];
+          print('Message $i: role=${msg.role}, type=${msg.messageType}, content="${msg.content.substring(0, msg.content.length.clamp(0, 50))}..."');
+        }
+      }
+      
+      // Clear messages and add new ones only after successful load
+      _messages.clear();
       _messages.addAll(messages);
     } catch (e) {
       _error = 'Failed to load conversation: $e';
       if (kDebugMode) {
         print('Error loading conversation: $e');
       }
+    } finally {
+      _isLoadingConversation = false;
+      notifyListeners(); // Notify that loading is complete
     }
-    
-    notifyListeners();
   }
 
   Future<void> archiveConversation(int conversationId, int userId) async {
@@ -206,7 +225,10 @@ class ChatProvider extends ChangeNotifier {
       await _conversationService.archiveConversation(conversationId, userId: userId);
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index != -1) {
-        _conversations[index] = _conversations[index].copyWith(status: 'archived');
+        _conversations[index] = _conversations[index].copyWith(
+          conversationState: 'archived',
+          isArchived: true,
+        );
         notifyListeners();
       }
     } catch (e) {
@@ -242,10 +264,16 @@ class ChatProvider extends ChangeNotifier {
       await _conversationService.updateConversationTitle(conversationId, newTitle, userId: userId);
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index != -1) {
-        _conversations[index] = _conversations[index].copyWith(title: newTitle);
+        _conversations[index] = _conversations[index].copyWith(
+          title: newTitle,
+          name: newTitle, // Update both title and name fields
+        );
         
         if (_currentConversation?.id == conversationId) {
-          _currentConversation = _currentConversation!.copyWith(title: newTitle);
+          _currentConversation = _currentConversation!.copyWith(
+            title: newTitle,
+            name: newTitle,
+          );
         }
         
         notifyListeners();
@@ -262,8 +290,14 @@ class ChatProvider extends ChangeNotifier {
   Future<void> continueConversation(int conversationId, int userId) async {
     try {
       await _conversationService.continueConversation(userId, conversationId);
-      // Reload conversations after continuing
-      await loadUserConversations(userId);
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
+      if (index != -1) {
+        _conversations[index] = _conversations[index].copyWith(
+          conversationState: 'active',
+          isArchived: false,
+        );
+        notifyListeners();
+      }
     } catch (e) {
       _error = 'Failed to continue conversation: $e';
       if (kDebugMode) {
@@ -290,8 +324,84 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Helper method to get conversations with filtering
+  List<Conversation> getFilteredConversations({
+    bool includeArchived = true,
+    String? searchQuery,
+  }) {
+    var filtered = _conversations.where((conv) {
+      if (!includeArchived && conv.isArchivedStatus) return false;
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        final query = searchQuery.toLowerCase();
+        return conv.title.toLowerCase().contains(query) ||
+               conv.preview.toLowerCase().contains(query);
+      }
+      return true;
+    }).toList();
+
+    // Sort by most recent activity
+    filtered.sort((a, b) {
+      final aTime = a.lastMessageAt ?? a.updatedAt;
+      final bTime = b.lastMessageAt ?? b.updatedAt;
+      return bTime.compareTo(aTime);
+    });
+
+    return filtered;
+  }
+
+  // Helper method to get conversation count by state
+  Map<String, int> getConversationStats() {
+    final stats = <String, int>{
+      'total': _conversations.length,
+      'active': 0,
+      'archived': 0,
+      'paused': 0,
+    };
+
+    for (final conv in _conversations) {
+      if (conv.isArchivedStatus) {
+        stats['archived'] = stats['archived']! + 1;
+      } else if (conv.isPaused) {
+        stats['paused'] = stats['paused']! + 1;
+      } else if (conv.isActive) {
+        stats['active'] = stats['active']! + 1;
+      }
+    }
+
+    return stats;
+  }
+
   void clearError() {
     _error = null;
+    notifyListeners();
+  }
+
+  // Helper method to refresh conversations
+  Future<void> refreshConversations(int userId) async {
+    try {
+      await loadUserConversations(userId);
+    } catch (e) {
+      _error = 'Failed to refresh conversations: $e';
+      if (kDebugMode) {
+        print('Error refreshing conversations: $e');
+      }
+      notifyListeners();
+    }
+  }
+
+  // Method to reset chat state when switching users
+  Future<void> resetForUser(int userId) async {
+    // Clear current state
+    _messages.clear();
+    _currentConversation = null;
+    _conversations.clear();
+    _error = null;
+    _isLoadingConversation = false;
+    
+    // Load new user's data if valid user ID
+    if (userId > 0) {
+      await loadUserConversations(userId);
+    }
     notifyListeners();
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Message {
   final int? id;
   final String role;
@@ -70,10 +72,31 @@ class Message {
       role = json['role'] as String;
     }
 
+    // Handle content parsing based on message type
+    String content = '';
+    if (messageType == 'ai_response') {
+      // For AI responses, content is an object with a 'response' key
+      final contentData = json['content'];
+      if (contentData is Map<String, dynamic>) {
+        content = contentData['response'] as String? ?? '';
+      } else if (contentData is String) {
+        // Fallback: try to parse as JSON string
+        try {
+          final parsedContent = jsonDecode(contentData) as Map<String, dynamic>;
+          content = parsedContent['response'] as String? ?? contentData;
+        } catch (e) {
+          content = contentData;
+        }
+      }
+    } else {
+      // For user messages, content is a direct string
+      content = json['content'] as String? ?? '';
+    }
+
     return Message(
       id: json['id'] as int?,
       role: role,
-      content: json['content'] as String? ?? '',
+      content: content,
       conversationId: json['conversation_id'] as int?,
       senderId: json['sender_id'] as int?,
       messageType: messageType,

@@ -11,7 +11,7 @@ class ConversationService {
       final response = await _chatApiService.getUserConversations(userId: userId);
       
       // Parse conversations from the new response structure
-      final List<dynamic> conversationsData = response['conversations'] ?? [];
+      final List<dynamic> conversationsData = response['conversations'] ?? response['data'] ?? [];
       final conversations = conversationsData.map((json) => Conversation.fromJson(json)).toList();
       
       // Sort conversations by last activity (last_message_at or updated_at), most recent first
@@ -36,7 +36,7 @@ class ConversationService {
       );
       
       // Extract messages from the new response structure
-      final List<dynamic> messagesData = response['messages'] ?? [];
+      final List<dynamic> messagesData = response['messages'] ?? response['data'] ?? [];
       return messagesData.map((json) => Message.fromJson(json)).toList();
     } catch (e) {
       Logger.error('Error loading messages', 'ConversationService', e);
@@ -52,7 +52,7 @@ class ConversationService {
       );
       
       // Extract messages from the conversation details
-      final conversationData = response['data'] ?? response;
+      final conversationData = response['data'] ?? response['conversation'] ?? response;
       final List<dynamic> messagesData = conversationData['messages'] ?? [];
       
       return messagesData.map((json) => Message.fromJson(json)).toList();
@@ -72,13 +72,13 @@ class ConversationService {
     try {
       final response = await _chatApiService.createNewConversation(
         userId: userId,
-        title: title,
+        name: title, // Use 'name' field as per new API
         conversationType: conversationType,
         description: description,
         contextData: contextData,
       );
       
-      final conversationData = response['data'] ?? response;
+      final conversationData = response['data'] ?? response['conversation'] ?? response;
       return Conversation.fromJson(conversationData);
     } catch (e) {
       throw Exception('Error creating conversation: $e');
@@ -160,7 +160,7 @@ class ConversationService {
         messageMetadata: messageMetadata,
       );
       
-      final messageData = response['data'] ?? response;
+      final messageData = response['data'] ?? response['message'] ?? response;
       return Message.fromJson(messageData);
     } catch (e) {
       throw Exception('Error sending message: $e');

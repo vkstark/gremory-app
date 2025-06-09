@@ -23,6 +23,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   bool _showSidebar = false;
+  int? _currentUserId; // Track current user ID to detect changes
 
   @override
   void initState() {
@@ -41,16 +42,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       
       authProvider.initialize();
       chatProvider.initialize(userId: authProvider.currentUser?.id);
-      
-      // Listen for auth changes and refresh chat data
-      authProvider.addListener(() {
-        if (mounted) {
-          final userId = authProvider.currentUser?.id;
-          if (userId != null) {
-            chatProvider.initialize(userId: userId);
-          }
-        }
-      });
     });
   }
 
@@ -76,47 +67,57 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final shouldShowPersistentSidebar = ResponsiveHelper.shouldShowSidebarPersistent(context);
-        
-        return Scaffold(
-          body: Row(
-            children: [
-              // Persistent sidebar for desktop
-              if (shouldShowPersistentSidebar && _showSidebar) ...[
-                Consumer<AuthProvider>(
-                  builder: (context, authProvider, child) {
-                    return SizedBox(
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        // Handle user switching
+        final currentUserId = authProvider.currentUser?.id;
+        if (_currentUserId != currentUserId && currentUserId != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final chatProvider = context.read<ChatProvider>();
+            chatProvider.resetForUser(currentUserId);
+          });
+          _currentUserId = currentUserId;
+        }
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final shouldShowPersistentSidebar = ResponsiveHelper.shouldShowSidebarPersistent(context);
+            
+            return Scaffold(
+              body: Row(
+                children: [
+                  // Persistent sidebar for desktop
+                  if (shouldShowPersistentSidebar && _showSidebar) ...[
+                    SizedBox(
                       width: ResponsiveHelper.getSidebarWidth(context),
                       child: ConversationSidebar(
                         userId: authProvider.currentUser?.id ?? -1,
                         onClose: () => setState(() => _showSidebar = false),
                       ),
-                    );
-                  },
-                ),
-                Container(width: 1, color: FallbackTheme.borderLight),
-              ],
-              // Main chat area
-              Expanded(
-                child: Stack(
-                  children: [
-                    Column(
+                    ),
+                    Container(width: 1, color: FallbackTheme.borderLight),
+                  ],
+                  // Main chat area
+                  Expanded(
+                    child: Stack(
                       children: [
-                        _buildAppBar(),
-                        Expanded(child: _buildChatArea()),
-                        _buildInputArea(),
+                        Column(
+                          children: [
+                            _buildAppBar(),
+                            Expanded(child: _buildChatArea()),
+                            _buildInputArea(),
+                          ],
+                        ),
+                        // Overlay sidebar for mobile/tablet
+                        if (!shouldShowPersistentSidebar && _showSidebar)
+                          _buildOverlaySidebar(),
                       ],
                     ),
-                    // Overlay sidebar for mobile/tablet
-                    if (!shouldShowPersistentSidebar && _showSidebar)
-                      _buildOverlaySidebar(),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -303,6 +304,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       builder: (context, chatProvider, child) {
         if (chatProvider.error != null) {
           return _buildErrorState(chatProvider);
+        }
+
+        // Show loading state when loading a conversation
+        if (chatProvider.isLoadingConversation) {
+          return _buildConversationLoadingState();
         }
 
         if (chatProvider.messages.isEmpty) {
@@ -507,6 +513,39 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       fontSize: ResponsiveHelper.getResponsiveFontSize(context, 14),
                     ),
                   ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildConversationLoadingState() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = ResponsiveHelper.isMobile(context);
+        final padding = ResponsiveHelper.getResponsivePadding(context);
+        
+        return Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(padding),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SpinKitThreeBounce(
+                  color: FallbackTheme.primaryPurple,
+                  size: isMobile ? 30 : 40,
+                ),
+                SizedBox(height: isMobile ? 16 : 24),
+                Text(
+                  'Loading conversation...',
+                  style: TextStyle(
+                    fontSize: ResponsiveHelper.getResponsiveFontSize(context, 16),
+                    color: FallbackTheme.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
