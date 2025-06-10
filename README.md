@@ -53,7 +53,7 @@ flutter pub get
 Run the following in your project directory to set your own default icon:
 
 ```bash
-flutter pub get
+flutter pub run flutter_launcher_icons
 ```
 
 ---
