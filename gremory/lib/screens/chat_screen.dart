@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:markdown/markdown.dart' as md;
+import 'package:markdown_widget/markdown_widget.dart';
 import '../providers/chat_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/message.dart';
@@ -642,29 +641,36 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                               height: 1.4,
                             ),
                           )
-                        : MarkdownBody(
+                        : MarkdownWidget(
                             data: message.content,
                             selectable: true,
-                            builders: {
-                              'code': InlineCodeBuilder(context),
-                              'pre': CodeBlockBuilder(context),
-                            },
-                            styleSheet: MarkdownStyleSheet(
-                              p: TextStyle(
-                                color: FallbackTheme.textPrimary,
-                                fontSize: ResponsiveHelper.getResponsiveFontSize(context, 15),
-                                height: 1.4,
-                              ),
-                              code: TextStyle(
-                                backgroundColor: FallbackTheme.surfacePurple,
-                                color: FallbackTheme.primaryPurple,
-                                fontSize: ResponsiveHelper.getResponsiveFontSize(context, 14),
-                                fontFamily: 'monospace',
-                              ),
-                              codeblockDecoration: BoxDecoration(
-                                color: FallbackTheme.surfacePurple,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
+                            shrinkWrap: true,
+                            config: MarkdownConfig(
+                              configs: [
+                                CodeConfig(
+                                  style: TextStyle(
+                                    backgroundColor: FallbackTheme.surfacePurple,
+                                    color: FallbackTheme.primaryPurple,
+                                    fontSize: ResponsiveHelper.getResponsiveFontSize(context, 14),
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                                PreConfig(
+                                  decoration: BoxDecoration(
+                                    color: FallbackTheme.surfacePurple,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: FallbackTheme.borderLight),
+                                  ),
+                                  wrapper: (child, code, language) => _buildCodeBlock(child, code, language),
+                                ),
+                                PConfig(
+                                  textStyle: TextStyle(
+                                    color: FallbackTheme.textPrimary,
+                                    fontSize: ResponsiveHelper.getResponsiveFontSize(context, 15),
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                   ),
@@ -856,6 +862,100 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _scrollToBottom();
   }
 
+  Widget _buildCodeBlock(Widget child, String code, String? language) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: FallbackTheme.surfacePurple,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: FallbackTheme.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with copy button
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: const BoxDecoration(
+              color: FallbackTheme.backgroundCard,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(8),
+                topRight: Radius.circular(8),
+              ),
+              border: Border(bottom: BorderSide(color: FallbackTheme.borderLight)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  language ?? 'code',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: FallbackTheme.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                InkWell(
+                  onTap: () => _copyToClipboard(context, code),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: FallbackTheme.primaryPurple.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: FallbackTheme.primaryPurple.withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.copy,
+                          size: 14,
+                          color: FallbackTheme.primaryPurple,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Copy',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: FallbackTheme.primaryPurple,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Code content
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _copyToClipboard(BuildContext context, String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Code copied to clipboard'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: FallbackTheme.primaryPurple,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+
   String _formatTime(DateTime dateTime) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
@@ -904,141 +1004,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class InlineCodeBuilder extends MarkdownElementBuilder {
-  final BuildContext context;
-  
-  InlineCodeBuilder(this.context);
-  
-  @override
-  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
-    // Return null to use the default inline code styling from styleSheet
-    return null;
-  }
-}
-
-class CodeBlockBuilder extends MarkdownElementBuilder {
-  final BuildContext context;
-  
-  CodeBlockBuilder(this.context);
-  
-  @override
-  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
-    final String textContent = element.textContent;
-    
-    if (textContent.isEmpty) return null;
-    
-    // Check if this is a code block (multi-line) vs inline code (single line without newlines)
-    // Code blocks typically have newlines, while inline code doesn't
-    final bool isCodeBlock = textContent.contains('\n') || textContent.length > 50;
-    
-    if (!isCodeBlock) {
-      // For inline code, return null to use the default style from styleSheet
-      return null;
-    }
-    
-    // This is a code block, render with header and copy button
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        color: FallbackTheme.surfacePurple,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: FallbackTheme.borderLight),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with copy button
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: const BoxDecoration(
-              color: FallbackTheme.backgroundCard,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(8),
-                topRight: Radius.circular(8),
-              ),
-              border: Border(bottom: BorderSide(color: FallbackTheme.borderLight)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  element.attributes['class'] ?? 'code',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: FallbackTheme.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                InkWell(
-                  onTap: () => _copyToClipboard(context, textContent),
-                  borderRadius: BorderRadius.circular(4),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: FallbackTheme.primaryPurple.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: FallbackTheme.primaryPurple.withValues(alpha: 0.3)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.copy,
-                          size: 14,
-                          color: FallbackTheme.primaryPurple,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Copy',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: FallbackTheme.primaryPurple,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Code content
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            child: SelectableText(
-              textContent,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 14,
-                color: FallbackTheme.textPrimary,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _copyToClipboard(BuildContext context, String text) {
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Code copied to clipboard'),
-        duration: const Duration(seconds: 2),
-        backgroundColor: FallbackTheme.primaryPurple,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
       ),
     );
   }
