@@ -222,13 +222,54 @@ class UserService {
 
   Future<User> editUserProfile(int userId, Map<String, dynamic> details) async {
     try {
+      // Prepare the request payload - restructuring to match API expectations
+      final Map<String, dynamic> requestPayload = {
+        'user_id': userId,
+      };
+      
+      // Map top-level fields
+      if (details['username'] != null) requestPayload['name'] = details['username'];
+      if (details['email'] != null) requestPayload['email'] = details['email'];
+      if (details['birthdate'] != null) requestPayload['birthdate'] = details['birthdate'];
+      if (details['timezone'] != null) requestPayload['timezone'] = details['timezone'];
+      if (details['language_preference'] != null) requestPayload['language_preference'] = details['language_preference'];
+      if (details['onboarding_source'] != null) requestPayload['signup_source'] = details['onboarding_source'];
+      
+      // Structure preferences object
+      Map<String, dynamic> preferences = {};
+      
+      if (details['interests'] != null) preferences['interests'] = details['interests'];
+      if (details['goals'] != null) preferences['goals'] = details['goals'];
+      if (details['experience_level'] != null) preferences['experience_level'] = details['experience_level'];
+      if (details['communication_style'] != null) preferences['communication_style'] = details['communication_style'];
+      if (details['content_preferences'] != null) preferences['content_preferences'] = details['content_preferences'];
+      if (details['industry'] != null) preferences['industry'] = details['industry'];
+      if (details['role'] != null) preferences['role'] = details['role'];
+      
+      if (preferences.isNotEmpty) {
+        requestPayload['preferences'] = preferences;
+      }
+      
+      Logger.debug('Updating user profile with payload: ${jsonEncode(requestPayload)}', 'UserService');
+      
       final response = await http.put(
-        Uri.parse('$baseUrl/users/$userId/edit'),
+        Uri.parse('$baseUrl/personalization/profile/$userId'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(details),
+        body: jsonEncode(requestPayload),
       );
+      
+      Logger.debug('Update user profile response: ${response.statusCode}', 'UserService');
+      
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
+        
+        // Add the user ID to response data if it's missing
+        if (responseData['data'] != null && responseData['data']['id'] == null) {
+          responseData['data']['id'] = userId;
+        } else if (responseData['id'] == null) {
+          responseData['id'] = userId;
+        }
+        
         if (responseData['data'] != null) {
           return User.fromJson(responseData['data']);
         } else {
@@ -236,10 +277,35 @@ class UserService {
         }
       } else {
         final errorData = jsonDecode(response.body);
-        throw Exception('Failed to update user: [31m${errorData['message'] ?? response.statusCode}[0m');
+        throw Exception('Failed to update user: ${errorData['message'] ?? response.statusCode}');
       }
     } catch (e) {
+      Logger.error('Error updating user profile', 'UserService', e);
       throw Exception('Error updating user: $e');
+    }
+  }
+  
+  Future<Map<String, dynamic>> fetchUserProfile(int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/personalization/profile/$userId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      
+      Logger.debug('Fetch user profile response: ${response.statusCode}', 'UserService');
+      
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        
+        // Return the raw response data to allow flexible handling in the provider
+        return responseData;
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw Exception('Failed to fetch user profile: ${errorData['message'] ?? response.statusCode}');
+      }
+    } catch (e) {
+      Logger.error('Error fetching user profile', 'UserService', e);
+      throw Exception('Error fetching user profile: $e');
     }
   }
 

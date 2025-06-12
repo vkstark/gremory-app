@@ -938,37 +938,119 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
   }
 
   void _showEditUserDialog(AuthProvider authProvider, User user) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => UserPersonalizationScreen(
-          basicDetails: {
-            'username': user.username ?? '',
-            'email': user.email ?? '',
-            'display_name': user.displayName,
-            'user_type': user.userType,
-            'phone_number': user.phoneNumber ?? '',
-            'timezone': user.timezone ?? 'UTC',
-            'language_preference': user.languagePreference,
-            'birthdate': '', // Add if available in user model
-            'interests': [], // Add if available in user model
-            'goals': [], // Add if available in user model
-            'experience_level': '', // Add if available in user model
-            'communication_style': '', // Add if available in user model
-            'content_preferences': {}, // Add if available in user model
-            'onboarding_source': '', // Add if available in user model
-            'industry': '', // Add if available in user model
-            'role': '', // Add if available in user model
-          },
-          onSubmit: (details) async {
-            // Store navigator reference before async call
-            final navigator = Navigator.of(context);
-            final scaffoldMessenger = ScaffoldMessenger.of(context);
-            
-            try {
-              await authProvider.editUserProfile(user.id, details);
+    // Show loading indicator while fetching profile data
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+    
+    // Fetch user profile data from the API
+    authProvider.fetchUserProfileForEdit(user.id).then((profileData) {
+      // Close loading indicator
+      Navigator.of(context).pop();
+      
+      // Navigate to personalization screen with the fetched data
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => UserPersonalizationScreen(
+            basicDetails: {
+              // Base user details (prefer API data but fallback to local model)
+              'username': profileData['username'] ?? user.username ?? '',
+              'email': profileData['email'] ?? user.email ?? '',
+              'display_name': profileData['displayName'] ?? user.displayName,
+              'user_type': user.userType,
+              'phone_number': user.phoneNumber ?? '',
+              'timezone': profileData['timezone'] ?? user.timezone ?? 'UTC',
+              'language_preference': profileData['languagePreference'] ?? user.languagePreference,
               
-              if (mounted && authProvider.error == null) {
+              // Extended profile details from API
+              'birthdate': profileData['birthdate'] ?? '',
+              'interests': profileData['interests'] ?? [],
+              'goals': profileData['goals'] ?? [],
+              'experience_level': profileData['experience_level'] ?? '',
+              'communication_style': profileData['communication_style'] ?? '',
+              'content_preferences': profileData['content_preferences'] ?? {},
+              'onboarding_source': profileData['onboarding_source'] ?? '',
+              'industry': profileData['industry'] ?? '',
+              'role': profileData['role'] ?? '',
+            },
+            onSubmit: (details) async {
+              // Store navigator reference before async call
+              final navigator = Navigator.of(context);
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              
+              try {
+                await authProvider.editUserProfile(user.id, details);
+                
+                if (mounted && authProvider.error == null) {
+                  if (mounted) {
+                    navigator.popUntil((route) => route.isFirst);
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Profile updated successfully!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } else if (mounted && authProvider.error != null) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Error: ${authProvider.error}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } catch (e) {
                 if (mounted) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+        ),
+      );
+    }).catchError((error) {
+      // Close loading indicator
+      Navigator.of(context).pop();
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load profile: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      
+      // Fall back to basic user information if API call fails
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => UserPersonalizationScreen(
+            basicDetails: {
+              'username': user.username ?? '',
+              'email': user.email ?? '',
+              'display_name': user.displayName,
+              'user_type': user.userType,
+              'phone_number': user.phoneNumber ?? '',
+              'timezone': user.timezone ?? 'UTC',
+              'language_preference': user.languagePreference,
+              'birthdate': '',
+              'interests': [],
+              'goals': [],
+            },
+            onSubmit: (details) async {
+              final navigator = Navigator.of(context);
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              
+              try {
+                await authProvider.editUserProfile(user.id, details);
+                
+                if (mounted && authProvider.error == null) {
                   navigator.popUntil((route) => route.isFirst);
                   scaffoldMessenger.showSnackBar(
                     const SnackBar(
@@ -976,28 +1058,28 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
                       backgroundColor: Colors.green,
                     ),
                   );
+                } else if (mounted && authProvider.error != null) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Error: ${authProvider.error}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
                 }
-              } else if (mounted && authProvider.error != null) {
-                scaffoldMessenger.showSnackBar(
-                  SnackBar(
-                    content: Text('Error: ${authProvider.error}'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+              } catch (e) {
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               }
-            } catch (e) {
-              if (mounted) {
-                scaffoldMessenger.showSnackBar(
-                  SnackBar(
-                    content: Text('Error: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            }
-          },
+            },
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 }

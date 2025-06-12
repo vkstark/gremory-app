@@ -28,19 +28,52 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    // Get id with multiple fallbacks for different API formats
+    int userId;
+    if (json['id'] is int) {
+      userId = json['id'];
+    } else if (json['user_id'] is int) {
+      userId = json['user_id'];
+    } else if (json['id'] is String && int.tryParse(json['id']) != null) {
+      userId = int.parse(json['id']);
+    } else if (json['user_id'] is String && int.tryParse(json['user_id']) != null) {
+      userId = int.parse(json['user_id']);
+    } else {
+      throw Exception('Invalid user ID format in response: ${json['id'] ?? json['user_id']}');
+    }
+    
+    // Parse dates with error handling
+    DateTime createdAt;
+    try {
+      createdAt = json['created_at'] != null 
+          ? DateTime.parse(json['created_at'].toString())
+          : DateTime.now();
+    } catch (e) {
+      createdAt = DateTime.now();
+    }
+    
+    DateTime updatedAt;
+    try {
+      updatedAt = json['updated_at'] != null 
+          ? DateTime.parse(json['updated_at'].toString()) 
+          : DateTime.now();
+    } catch (e) {
+      updatedAt = DateTime.now();
+    }
+    
     return User(
-      id: json['id'] as int,
-      username: json['username'] as String?,
+      id: userId,
+      username: json['username'] as String? ?? json['name'] as String?,
       email: json['email'] as String?,
-      displayName: json['display_name'] as String? ?? 'User',
+      displayName: json['display_name'] as String? ?? json['name'] as String? ?? 'User',
       userType: json['user_type'] as String? ?? 'guest',
       status: json['status'] as String? ?? 'active',
       phoneNumber: json['phone_number'] as String?,
       timezone: json['timezone'] as String?,
       languagePreference: json['language_preference'] as String? ?? 'en',
       guestSessionId: json['guest_session_id'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 

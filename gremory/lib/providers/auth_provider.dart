@@ -310,4 +310,66 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<Map<String, dynamic>> fetchUserProfileForEdit(int userId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final profileData = await _userService.fetchUserProfile(userId);
+
+      // Map API response to our form structure
+      final Map<String, dynamic> formattedData = {
+        'username': profileData['name'],
+        'email': profileData['email'],
+        'birthdate': profileData['birthdate'],
+        'timezone': profileData['timezone'],
+        'languagePreference': profileData['language_preference'],
+        'onboarding_source': profileData['signup_source'],
+      };
+
+      // Extract data from nested preferences object
+      if (profileData['preferences'] != null) {
+        final preferences = profileData['preferences'];
+
+        if (preferences['interests'] != null) {
+          formattedData['interests'] = preferences['interests'];
+        }
+
+        if (preferences['goals'] != null) {
+          formattedData['goals'] = preferences['goals'];
+        }
+
+        if (preferences['experience_level'] != null) {
+          formattedData['experience_level'] = preferences['experience_level'];
+        }
+
+        if (preferences['communication_style'] != null) {
+          formattedData['communication_style'] = preferences['communication_style'];
+        }
+
+        if (preferences['content_preferences'] != null) {
+          formattedData['content_preferences'] = preferences['content_preferences'];
+        }
+
+        if (preferences['industry'] != null) {
+          formattedData['industry'] = preferences['industry'];
+        }
+
+        if (preferences['role'] != null) {
+          formattedData['role'] = preferences['role'];
+        }
+      }
+
+      return formattedData;
+    } catch (e) {
+      _error = 'Failed to fetch user profile: $e';
+      Logger.error('Failed to fetch user profile', 'AuthProvider', e);
+      throw Exception('Failed to fetch user profile: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 }
