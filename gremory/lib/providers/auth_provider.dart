@@ -82,8 +82,17 @@ class AuthProvider extends ChangeNotifier {
     String? email,
     String? displayName,
     String? phoneNumber,
-    String timezone = 'UTC',
-    String languagePreference = 'en',
+    String? timezone = 'UTC',
+    String? languagePreference = 'en',
+    String? birthdate,
+    List<String>? interests,
+    List<String>? goals,
+    String? experienceLevel,
+    String? communicationStyle,
+    dynamic contentPreferences,
+    String? onboardingSource,
+    String? industry,
+    String? role,
   }) async {
     _isLoading = true;
     _error = null;
@@ -96,8 +105,17 @@ class AuthProvider extends ChangeNotifier {
         displayName: displayName,
         userType: 'registered',
         phoneNumber: phoneNumber,
-        timezone: timezone,
-        languagePreference: languagePreference,
+        timezone: timezone ?? 'UTC',
+        languagePreference: languagePreference ?? 'en',
+        birthdate: birthdate,
+        interests: interests,
+        goals: goals,
+        experienceLevel: experienceLevel,
+        communicationStyle: communicationStyle,
+        contentPreferences: contentPreferences,
+        onboardingSource: onboardingSource,
+        industry: industry,
+        role: role,
       );
 
       _currentUser = user;
@@ -134,12 +152,34 @@ class AuthProvider extends ChangeNotifier {
     String? email,
     String? displayName,
     String? phoneNumber,
+    String? timezone,
+    String? languagePreference,
+    String? birthdate,
+    List<String>? interests,
+    List<String>? goals,
+    String? experienceLevel,
+    String? communicationStyle,
+    dynamic contentPreferences,
+    String? onboardingSource,
+    String? industry,
+    String? role,
   }) async {
     await registerUser(
       username: username,
       email: email,
       displayName: displayName,
       phoneNumber: phoneNumber,
+      timezone: timezone,
+      languagePreference: languagePreference,
+      birthdate: birthdate,
+      interests: interests,
+      goals: goals,
+      experienceLevel: experienceLevel,
+      communicationStyle: communicationStyle,
+      contentPreferences: contentPreferences,
+      onboardingSource: onboardingSource,
+      industry: industry,
+      role: role,
     );
   }
 
@@ -252,5 +292,22 @@ class AuthProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  Future<void> editUserProfile(int userId, Map<String, dynamic> details) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final updatedUser = await _userService.editUserProfile(userId, details);
+      _currentUser = updatedUser;
+      await _saveUserToPrefs(updatedUser);
+      await loadAvailableUsers();
+    } catch (e) {
+      _error = 'Failed to update profile: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

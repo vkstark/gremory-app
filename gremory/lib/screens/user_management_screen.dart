@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
 import '../theme/fallback_theme.dart';
+import 'user_personalization_screen.dart';
 
 class UserManagementScreen extends StatefulWidget {
   const UserManagementScreen({super.key});
@@ -617,7 +618,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
 
   void _showCreateUserDialog() {
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
-    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -631,61 +631,42 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
               children: [
                 TextFormField(
                   controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Username *',
-                    hintText: 'Enter username',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: const InputDecoration(labelText: 'Username *'),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
+                    if (value == null || value.isEmpty) {
                       return 'Username is required';
                     }
-                    if (value.trim().length < 3) {
-                      return 'Username must be at least 3 characters';
-                    }
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    hintText: 'Enter email (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Email *'),
                   validator: (value) {
-                    if (value != null && value.isNotEmpty && 
-                        !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                      return 'Please enter a valid email';
+                    if (value == null || value.isEmpty) {
+                      return 'Email is required';
+                    }
+                    final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+                    if (!emailRegex.hasMatch(value)) {
+                      return 'Enter a valid email';
                     }
                     return null;
                   },
+                  keyboardType: TextInputType.emailAddress,
                 ),
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: _displayNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Display Name *',
-                    hintText: 'Enter display name',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: const InputDecoration(labelText: 'Display Name *'),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
+                    if (value == null || value.isEmpty) {
                       return 'Display name is required';
                     }
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: _phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone Number',
-                    hintText: 'Enter phone number (optional)',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: const InputDecoration(labelText: 'Phone Number'),
                   keyboardType: TextInputType.phone,
                 ),
               ],
@@ -703,14 +684,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
           Consumer<AuthProvider>(
             builder: (context, authProvider, child) {
               return ElevatedButton(
-                onPressed: () => _handleCreateUser(authProvider),
-                child: authProvider.isLoading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Create User'),
+                onPressed: () {
+                  if (_formKey.currentState?.validate() == true) {
+                    Navigator.of(context).pop();
+                    _showPersonalizationChoiceDialog(authProvider);
+                  }
+                },
+                child: const Text('Continue'),
               );
             },
           ),
@@ -719,134 +699,133 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
     );
   }
 
-  void _showEditUserDialog(AuthProvider authProvider, User user) {
-    _usernameController.text = user.username ?? '';
-    _emailController.text = user.email ?? '';
-    _displayNameController.text = user.displayName;
-    _phoneController.text = user.phoneNumber ?? '';
-
+  void _showPersonalizationChoiceDialog(AuthProvider authProvider) {
+    // Store values now, before dialog is closed
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+    final displayName = _displayNameController.text.trim();
+    final phoneNumber = _phoneController.text.trim();
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Edit User Profile'),
-        content: SizedBox(
-          width: 400,
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Username',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _displayNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Display Name *',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Display name is required';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone Number',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.phone,
-                ),
-              ],
-            ),
-          ),
-        ),
+        title: const Text('Personalize Experience?'),
+        content: const Text('Would you like to personalize your experience with more details?'),
         actions: [
+          TextButton(
+            onPressed: () async {
+              // Store the navigator before async operation
+              final navigator = Navigator.of(context);
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              
+              // Close dialog first
+              navigator.pop();
+              
+              // Then do async work
+              await authProvider.createAndSwitchToNewUser(
+                username: username,
+                email: email,
+                displayName: displayName,
+                phoneNumber: phoneNumber,
+                timezone: 'UTC',
+                languagePreference: 'en',
+              );
+              
+              if (mounted && authProvider.error == null) {
+                _clearForm();
+                if (mounted) {
+                  navigator.popUntil((route) => route.isFirst);
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('User created successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('No, Create Now'),
+          ),
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              _clearForm();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => UserPersonalizationScreen(
+                    basicDetails: {
+                      'username': _usernameController.text.trim(),
+                      'email': _emailController.text.trim(),
+                      'display_name': _displayNameController.text.trim(),
+                      'user_type': 'registered',
+                      'phone_number': _phoneController.text.trim(),
+                      'timezone': 'UTC',
+                      'language_preference': 'en',
+                    },                    onSubmit: (details) async {
+            // Store navigator reference before async call
+            final navigator = Navigator.of(context);
+            final scaffoldMessenger = ScaffoldMessenger.of(context);
+            
+            try {
+              await authProvider.createAndSwitchToNewUser(
+                username: details['username'],
+                email: details['email'],
+                displayName: details['display_name'],
+                phoneNumber: details['phone_number'],
+                timezone: details['timezone'],
+                languagePreference: details['language_preference'],
+                birthdate: details['birthdate'],
+                interests: details['interests'],
+                goals: details['goals'],
+                experienceLevel: details['experience_level'],
+                communicationStyle: details['communication_style'],
+                contentPreferences: details['content_preferences'],
+                onboardingSource: details['onboarding_source'],
+                industry: details['industry'],
+                role: details['role'],
+              );
+              
+              if (mounted && authProvider.error == null) {
+                _clearForm();
+                if (mounted) {
+                  navigator.popUntil((route) => route.isFirst);
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('User created successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } else if (mounted && authProvider.error != null) {
+                scaffoldMessenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Error: ${authProvider.error}'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            } catch (e) {
+              if (mounted) {
+                scaffoldMessenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Error: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+                    },
+                  ),
+                ),
+              );
             },
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => _handleUpdateUser(authProvider),
-            child: authProvider.isLoading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Update'),
+            child: const Text('Yes, Personalize'),
           ),
         ],
       ),
     );
   }
 
-  void _handleCreateUser(AuthProvider authProvider) async {
-    if (_formKey.currentState?.validate() == true) {
-      await authProvider.createAndSwitchToNewUser(
-        username: _usernameController.text.trim(),
-        email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
-        displayName: _displayNameController.text.trim(),
-        phoneNumber: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
-      );
-
-      if (mounted && authProvider.error == null) {
-        Navigator.of(context).pop();
-        _clearForm();
-        // Navigate back to home screen
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('User created successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    }
-  }
-
-  void _handleUpdateUser(AuthProvider authProvider) async {
-    if (_formKey.currentState?.validate() == true) {
-      await authProvider.updateUserProfile(
-        username: _usernameController.text.trim().isNotEmpty ? _usernameController.text.trim() : null,
-        email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
-        displayName: _displayNameController.text.trim(),
-        phoneNumber: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
-      );
-
-      if (mounted && authProvider.error == null) {
-        Navigator.of(context).pop();
-        _clearForm();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    }
-  }
+  // This method has been replaced by direct calls to authProvider.createAndSwitchToNewUser
 
   void _switchToUser(AuthProvider authProvider, User user) async {
     await authProvider.switchToUser(user);
@@ -956,5 +935,69 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
+  }
+
+  void _showEditUserDialog(AuthProvider authProvider, User user) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => UserPersonalizationScreen(
+          basicDetails: {
+            'username': user.username ?? '',
+            'email': user.email ?? '',
+            'display_name': user.displayName,
+            'user_type': user.userType,
+            'phone_number': user.phoneNumber ?? '',
+            'timezone': user.timezone ?? 'UTC',
+            'language_preference': user.languagePreference,
+            'birthdate': '', // Add if available in user model
+            'interests': [], // Add if available in user model
+            'goals': [], // Add if available in user model
+            'experience_level': '', // Add if available in user model
+            'communication_style': '', // Add if available in user model
+            'content_preferences': {}, // Add if available in user model
+            'onboarding_source': '', // Add if available in user model
+            'industry': '', // Add if available in user model
+            'role': '', // Add if available in user model
+          },
+          onSubmit: (details) async {
+            // Store navigator reference before async call
+            final navigator = Navigator.of(context);
+            final scaffoldMessenger = ScaffoldMessenger.of(context);
+            
+            try {
+              await authProvider.editUserProfile(user.id, details);
+              
+              if (mounted && authProvider.error == null) {
+                if (mounted) {
+                  navigator.popUntil((route) => route.isFirst);
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Profile updated successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } else if (mounted && authProvider.error != null) {
+                scaffoldMessenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Error: ${authProvider.error}'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            } catch (e) {
+              if (mounted) {
+                scaffoldMessenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Error: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+          },
+        ),
+      ),
+    );
   }
 }

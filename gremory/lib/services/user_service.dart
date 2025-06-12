@@ -14,6 +14,15 @@ class UserService {
     String? phoneNumber,
     String timezone = 'UTC',
     String languagePreference = 'en',
+    String? birthdate,
+    List<String>? interests,
+    List<String>? goals,
+    String? experienceLevel,
+    String? communicationStyle,
+    dynamic contentPreferences,
+    String? onboardingSource,
+    String? industry,
+    String? role,
   }) async {
     try {
       final Map<String, dynamic> requestBody = {
@@ -34,6 +43,33 @@ class UserService {
       }
       if (phoneNumber != null && phoneNumber.isNotEmpty) {
         requestBody['phone_number'] = phoneNumber;
+      }
+      if (birthdate != null && birthdate.isNotEmpty) {
+        requestBody['birthdate'] = birthdate;
+      }
+      if (interests != null && interests.isNotEmpty) {
+        requestBody['interests'] = interests;
+      }
+      if (goals != null && goals.isNotEmpty) {
+        requestBody['goals'] = goals;
+      }
+      if (experienceLevel != null && experienceLevel.isNotEmpty) {
+        requestBody['experience_level'] = experienceLevel;
+      }
+      if (communicationStyle != null && communicationStyle.isNotEmpty) {
+        requestBody['communication_style'] = communicationStyle;
+      }
+      if (contentPreferences != null) {
+        requestBody['content_preferences'] = contentPreferences;
+      }
+      if (onboardingSource != null && onboardingSource.isNotEmpty) {
+        requestBody['onboarding_source'] = onboardingSource;
+      }
+      if (industry != null && industry.isNotEmpty) {
+        requestBody['industry'] = industry;
+      }
+      if (role != null && role.isNotEmpty) {
+        requestBody['role'] = role;
       }
 
       Logger.debug('Creating user with payload: ${jsonEncode(requestBody)}', 'UserService');
@@ -178,6 +214,29 @@ class UserService {
       } else {
         final errorData = jsonDecode(response.body);
         throw Exception('Failed to update user: ${errorData['message'] ?? response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error updating user: $e');
+    }
+  }
+
+  Future<User> editUserProfile(int userId, Map<String, dynamic> details) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/users/$userId/edit'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(details),
+      );
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        if (responseData['data'] != null) {
+          return User.fromJson(responseData['data']);
+        } else {
+          return User.fromJson(responseData);
+        }
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw Exception('Failed to update user: [31m${errorData['message'] ?? response.statusCode}[0m');
       }
     } catch (e) {
       throw Exception('Error updating user: $e');
